@@ -6,14 +6,31 @@ namespace EowKit.Core;
 public sealed class HardwareProbe
 {
     public long TotalRamBytes { get; init; }
+    public bool HasAvx2 { get; init; }
+    public bool HasCuda { get; init; }
+    public bool HasOpenCl { get; init; }
+    public bool HasMetal { get; init; }
+    public int LogicalCores { get; init; }
 
     public static async Task<HardwareProbe> ProbeAsync()
     {
+        long ram;
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            return new() { TotalRamBytes = GetWindowsTotalMem() };
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            return new() { TotalRamBytes = await GetMacTotalMemAsync() };
-        return new() { TotalRamBytes = GetLinuxTotalMem() };
+            ram = GetWindowsTotalMem();
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            ram = await GetMacTotalMemAsync();
+        else
+            ram = GetLinuxTotalMem();
+
+        return new()
+        {
+            TotalRamBytes = ram,
+            HasAvx2 = System.Runtime.Intrinsics.X86.Avx2.IsSupported,
+            HasCuda = DetectCuda(),
+            HasOpenCl = DetectOpenCl(),
+            HasMetal = DetectMetal(),
+            LogicalCores = Environment.ProcessorCount
+        };
     }
 
     static long GetLinuxTotalMem()
@@ -46,6 +63,34 @@ public sealed class HardwareProbe
         MEMORYSTATUSEX memStat = new() { dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>() };
         GlobalMemoryStatusEx(ref memStat);
         return (long)memStat.ullTotalPhys;
+    }
+
+    static bool DetectCuda()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return NativeLibrary.TryLoad("nvcuda.dll", out _);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return NativeLibrary.TryLoad("libcuda.so.1", out _) || NativeLibrary.TryLoad("libcuda.so", out _);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return false;
+        return false;
+    }
+
+    static bool DetectOpenCl()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return NativeLibrary.TryLoad("OpenCL.dll", out _);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+            return NativeLibrary.TryLoad("libOpenCL.so.1", out _) || NativeLibrary.TryLoad("libOpenCL.so", out _);
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            return NativeLibrary.TryLoad("/System/Library/Frameworks/OpenCL.framework/OpenCL", out _);
+        return false;
+    }
+
+    static bool DetectMetal()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) return false;
+        return NativeLibrary.TryLoad("/System/Library/Frameworks/Metal.framework/Metal", out _);
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]

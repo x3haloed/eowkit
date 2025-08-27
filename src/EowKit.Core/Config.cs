@@ -9,6 +9,7 @@ public sealed class Config
     public MobileSection Mobile { get; init; } = new();
     public WikiSection Wiki { get; init; } = new();
     public LlmSection Llm { get; init; } = new();
+    public LlmRuntimeSection LlmRuntime { get; init; } = new();
     public RetrievalSection Retrieval { get; init; } = new();
     public PromptSection Prompt { get; init; } = new();
     public RerankerSection Reranker { get; init; } = new();
@@ -32,6 +33,8 @@ public sealed class Config
         var rr = (TomlTable)doc["reranker"];
         TomlTable? paths = null;
         if (doc.ContainsKey("paths")) paths = (TomlTable)doc["paths"];        
+        TomlTable? llmrt = null;
+        if (doc.ContainsKey("llm_runtime")) llmrt = (TomlTable)doc["llm_runtime"];        
 
         var cfg = new Config
         {
@@ -48,6 +51,10 @@ public sealed class Config
                 OllamaUrl = (string?)llm["ollama_url"] ?? "http://127.0.0.1:11434",
                 ContextTokens = Convert.ToInt32(llm["context_tokens"]),
                 Temperature = Convert.ToDouble(llm["temperature"])
+            },
+            LlmRuntime = new LlmRuntimeSection
+            {
+                NumThreads = llmrt is null ? Math.Max(1, Environment.ProcessorCount/2) : Convert.ToInt32(llmrt["num_threads"])
             },
             Retrieval = new RetrievalSection
             {
@@ -78,6 +85,7 @@ public sealed class Config
     public sealed record MobileSection { public string MlcModel { get; init; } = ""; }
     public sealed record WikiSection { public string Zim { get; init; } = ""; public int KiwixPort { get; init; } = 8080; public string Bind { get; init; } = "127.0.0.1"; }
     public sealed record LlmSection { public string OllamaUrl { get; init; } = "http://127.0.0.1:11434"; public int ContextTokens { get; init; } = 4096; public double Temperature { get; init; } = 0.2; }
+    public sealed record LlmRuntimeSection { public int NumThreads { get; init; } = Math.Max(1, Environment.ProcessorCount/2); }
     public sealed record RetrievalSection { public int K { get; init; } = 40; public int MaxArticles { get; init; } = 5; public bool Rerank { get; init; } = false; }
     public sealed record PromptSection { public string System { get; init; } = ""; }
     public sealed record RerankerSection

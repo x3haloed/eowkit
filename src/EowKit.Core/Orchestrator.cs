@@ -66,7 +66,7 @@ public sealed class Orchestrator
         var context = string.Join("\n\n", articles.Select(a => $"# {a.title}\n{a.text}"));
         var prompt = $"{system}\n\nRetrieved context (from local Wikipedia):\n{context}\n\nQuestion: {question}";
 
-        var reply = await _ollama.ChatOnceAsync(_cfg.Model.Ollama, prompt, _cfg.Llm.ContextTokens, _cfg.Llm.Temperature);
+        var reply = await _ollama.ChatOnceAsync(_cfg.Model.Ollama, prompt, _cfg.Llm.ContextTokens, _cfg.Llm.Temperature, _cfg.LlmRuntime.NumThreads);
 
         // 4) add human-friendly citations (titles only, local snapshot)
         var cites = "Sources: " + string.Join("; ", articles.Select(a => a.title));

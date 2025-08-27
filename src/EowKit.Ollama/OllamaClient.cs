@@ -67,12 +67,12 @@ public sealed class OllamaClient
         }
     }
 
-    public async Task<string> ChatOnceAsync(string model, string prompt, int ctx, double temp)
+    public async Task<string> ChatOnceAsync(string model, string prompt, int ctx, double temp, int? numThreads = null)
     {
         var req = new
         {
             model,
-            options = new { num_ctx = ctx, temperature = temp },
+            options = new { num_ctx = ctx, temperature = temp, num_thread = numThreads },
             messages = new[]
             {
                 new { role = "system", content = "You are a concise, citation-first encyclopedia assistant." },

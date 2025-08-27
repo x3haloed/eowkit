@@ -66,6 +66,9 @@ public static class Installer
                 .AddChoices(catalog.Models)
                 .UseConverter(m => $"{m.Id} [{m.Runner}/{m.Precision}]  (~{m.ApproxBytes/1_000_000_000.0:F0} GB, min RAM {m.MinRamBytes/1_000_000_000.0:F0} GB)")
         );
+        // Suggest a default based on hardware
+        var hw = probe;
+        AnsiConsole.MarkupLine($"[grey]Hint[/]: {(hw.HasMetal ? "Metal GPU detected; consider fp16/q4_0 on Mac." : hw.HasCuda ? "CUDA GPU detected; larger models may work." : hw.HasAvx2 ? "AVX2 CPU detected; use q8_0 or fp16 small." : "No AVX2; prefer small quantized models.")}");
         if (probe.TotalRamBytes < model.MinRamBytes)
             AnsiConsole.MarkupLine($"[red]WARNING[/]: Not enough RAM for {model.Id} (have {probe.TotalRamBytes/1_000_000_000.0:F1} GB, need {model.MinRamBytes/1_000_000_000.0:F1} GB).");
 
@@ -120,8 +123,11 @@ public static class Installer
             AnsiConsole.MarkupLine($"[grey]MLC note[/]: Download mobile artifact from https://huggingface.co/{model.Id}");
         }
 
-        // 4) Patch config in-place
+        // 4) Patch config in-place, and set a default thread count recommendation
         ConfigPatcher(cfgPath, model.Id, wikiTarget);
+        var suggestedThreads = Math.Clamp(Environment.ProcessorCount / 2, 1, Environment.ProcessorCount);
+        if (hw.HasAvx2 && Environment.ProcessorCount >= 8) suggestedThreads = Math.Min(Environment.ProcessorCount - 2, 12);
+        ConfigEditor.SetInSection(cfgPath, "llm_runtime", "num_threads", suggestedThreads.ToString());
         AnsiConsole.MarkupLine($"\n[green]Updated[/] {cfgPath} with model={model.Id} and wiki.zim={Path.GetFileName(wikiTarget)}");
     }
 

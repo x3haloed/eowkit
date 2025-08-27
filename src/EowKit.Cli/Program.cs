@@ -12,7 +12,9 @@ switch (command)
     {
         var probe = await HardwareProbe.ProbeAsync();
         AnsiConsole.MarkupLine($"[bold]RAM:[/] {probe.TotalRamBytes/1_000_000_000.0:F1} GB  " +
-                               $"[bold]Disk Free:[/] {DiskProbe.GetFreeBytes(".")/1_000_000_000.0:F1} GB");
+                               $"[bold]Disk Free:[/] {DiskProbe.GetFreeBytes(".")/1_000_000_000.0:F1} GB  " +
+                               $"[bold]CPU AVX2:[/] {(probe.HasAvx2 ? "yes" : "no")}  [bold]Cores:[/] {probe.LogicalCores}  " +
+                               $"[bold]GPU:[/] CUDA={(probe.HasCuda?"yes":"no")}, OpenCL={(probe.HasOpenCl?"yes":"no")}, Metal={(probe.HasMetal?"yes":"no")}");
         break;
     }
 
