@@ -56,7 +56,7 @@ public static class Installer
                 .Title("Choose a [green]Wikipedia snapshot[/]:")
                 .PageSize(10)
                 .AddChoices(catalog.Wikis)
-                .UseConverter(w => $"{w.Name}  (~{w.ApproxBytes/1_000_000_000.0:F0} GB)")
+                .UseConverter(w => Markup.Escape($"{w.Name}  (~{w.ApproxBytes/1_000_000_000.0:F0} GB)"))
         );
         var finalWikiPath = Path.Combine(zimDir, wiki.Name);
         var freeDiskWiki = DiskProbe.GetFreeBytes(finalWikiPath);
@@ -69,7 +69,7 @@ public static class Installer
                 .Title("Choose an [green]LLM[/]:")
                 .PageSize(10)
                 .AddChoices(catalog.Models)
-                .UseConverter(m => $"{m.Id} [{m.Runner}/{m.Precision}]  (~{m.ApproxBytes/1_000_000_000.0:F0} GB, min RAM {m.MinRamBytes/1_000_000_000.0:F0} GB)")
+                .UseConverter(m => Markup.Escape($"{m.Id} [{m.Runner}/{m.Precision}]  (~{m.ApproxBytes/1_000_000_000.0:F0} GB, min RAM {m.MinRamBytes/1_000_000_000.0:F0} GB)"))
         );
         // Suggest a default based on hardware
         var hw = probe;
