@@ -1,3 +1,6 @@
+dist/
+publish/
+
 # Created by https://www.toptal.com/developers/gitignore/api/linux,macos,windows,dotnetcore,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=linux,macos,windows,dotnetcore,visualstudiocode
 
