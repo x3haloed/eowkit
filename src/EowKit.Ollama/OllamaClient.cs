@@ -23,7 +23,8 @@ public sealed class OllamaClient
         // Try a ping; if fail, start `ollama serve`
         if (await PingAsync()) return;
 
-        var psi = new ProcessStartInfo("ollama", "serve")
+        var exe = ResolveOllamaPath() ?? "ollama";
+        var psi = new ProcessStartInfo(exe, "serve")
         {
             UseShellExecute = false, CreateNoWindow = true
         };
@@ -40,6 +41,32 @@ public sealed class OllamaClient
             await Task.Delay(500);
         }
         throw new Exception("ollama serve did not start");
+    }
+
+    static string? ResolveOllamaPath()
+    {
+        // Look next to app config paths. We expect installer wrote paths.ollama_dir
+        try
+        {
+            var cfgPath = Path.Combine(AppContext.BaseDirectory, "configs", "eowkit.toml");
+            if (File.Exists(cfgPath))
+            {
+                var lines = File.ReadAllLines(cfgPath);
+                var l = lines.FirstOrDefault(x => x.TrimStart().StartsWith("ollama_dir"));
+                if (l is not null)
+                {
+                    var eq = l.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var root = l[(eq+1)..].Trim().Trim('"');
+                        var bin = Path.Combine(root, OperatingSystem.IsWindows() ? "ollama.exe" : "ollama");
+                        if (File.Exists(bin)) return bin;
+                    }
+                }
+            }
+        }
+        catch { }
+        return null;
     }
 
     async Task<bool> PingAsync()

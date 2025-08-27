@@ -48,6 +48,11 @@ public static class Installer
         await KiwixToolsInstaller.EnsureKiwixServeAsync(toolsDir, downloadsDir);
         ConfigEditor.SetInSection(cfgPath, "paths", "kiwix_tools_dir", $"\"{toolsDir.Replace("\\", "/")}\"");
 
+        // Ensure local ollama CLI so we can run without system install
+        var ollamaDir = Path.Combine(modelsDir, "ollama");
+        await OllamaInstaller.EnsureOllamaAsync(ollamaDir, downloadsDir);
+        ConfigEditor.SetInSection(cfgPath, "paths", "ollama_dir", $"\"{ollamaDir.Replace("\\", "/")}\"");
+
         AnsiConsole.MarkupLine($"[bold]Detected RAM[/]: {probe.TotalRamBytes/1_000_000_000.0:F1} GB");
 
         // 1) Pick Wikipedia pack
