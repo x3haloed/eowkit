@@ -74,7 +74,8 @@ public sealed class Config
             {
                 DownloadsDir = (string?)paths?["downloads_dir"] ?? "",
                 ZimDir = (string?)paths?["zim_dir"] ?? "",
-                ModelsDir = (string?)paths?["models_dir"] ?? ""
+                ModelsDir = (string?)paths?["models_dir"] ?? "",
+                KiwixToolsDir = (string?)paths?["kiwix_tools_dir"] ?? ""
             }
         };
 
@@ -100,5 +101,6 @@ public sealed class Config
         public string DownloadsDir { get; init; } = ""; // default: current directory
         public string ZimDir { get; init; } = "";     // default: current directory
         public string ModelsDir { get; init; } = "";  // default: current directory
+        public string KiwixToolsDir { get; init; } = "";  // where kiwix-serve is placed locally
     }
 }

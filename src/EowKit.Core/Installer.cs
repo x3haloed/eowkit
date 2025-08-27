@@ -43,6 +43,11 @@ public static class Installer
         NoteVolume("ZIM storage", zimDir);
         NoteVolume("Models", modelsDir);
 
+        // Ensure local kiwix-serve in models/tools to make binary portable
+        var toolsDir = Path.Combine(modelsDir, "tools");
+        await KiwixToolsInstaller.EnsureKiwixServeAsync(toolsDir, downloadsDir);
+        ConfigEditor.SetInSection(cfgPath, "paths", "kiwix_tools_dir", $"\"{toolsDir.Replace("\\", "/")}\"");
+
         AnsiConsole.MarkupLine($"[bold]Detected RAM[/]: {probe.TotalRamBytes/1_000_000_000.0:F1} GB");
 
         // 1) Pick Wikipedia pack

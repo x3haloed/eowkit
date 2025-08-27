@@ -44,13 +44,6 @@ publish_one() {
 
   cp -R "$ROOT/configs" "$pkgdir/"
   cp "$ROOT/README.md" "$pkgdir/"
-  if [[ -f "$ROOT/scripts/eowkit.sh" ]]; then
-    cp "$ROOT/scripts/eowkit.sh" "$pkgdir/" || true
-    chmod +x "$pkgdir/eowkit.sh" 2>/dev/null || true
-  fi
-  if [[ -f "$ROOT/scripts/eowkit.ps1" ]]; then
-    cp "$ROOT/scripts/eowkit.ps1" "$pkgdir/" || true
-  fi
 
   if [[ "$rid" == win-* ]]; then
     (cd "$DIST" && zip -qr "eowkit-$rid.zip" "eowkit-$rid")

@@ -19,11 +19,29 @@ public sealed class KiwixClient
     {
         if (await IsAliveAsync()) return;
 
-        var psi = new ProcessStartInfo("kiwix-serve", $"--port={_port} \"{zimPath}\"")
+        var servePath = ResolveKiwixServePath();
+        if (servePath is null)
+        {
+            var msg = OperatingSystem.IsMacOS() ?
+                "kiwix-serve not found. It should have been downloaded automatically; re-run install." :
+                (OperatingSystem.IsWindows() ?
+                    "kiwix-serve not found. It should have been downloaded automatically; re-run install." :
+                    "kiwix-serve not found. It should have been downloaded automatically; re-run install.");
+            throw new Exception(msg);
+        }
+
+        var psi = new ProcessStartInfo(servePath, $"--port={_port} \"{zimPath}\"")
         {
             UseShellExecute = false, CreateNoWindow = true
         };
-        Process.Start(psi);
+        try
+        {
+            Process.Start(psi);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to start kiwix-serve at '{servePath}': {ex.Message}");
+        }
 
         // wait a moment for server to bind
         for (int i=0;i<15;i++)
@@ -32,6 +50,81 @@ public sealed class KiwixClient
             await Task.Delay(500);
         }
         throw new Exception("kiwix-serve did not start");
+    }
+
+    static string? ResolveKiwixServePath()
+    {
+        // 1) Environment override
+        var env = Environment.GetEnvironmentVariable("KIWIX_SERVE");
+        if (!string.IsNullOrWhiteSpace(env) && File.Exists(env)) return env;
+
+        // 2) Local directory next to executable
+        var baseDir = AppContext.BaseDirectory;
+        var candidate = Path.Combine(baseDir, OperatingSystem.IsWindows() ? "kiwix-serve.exe" : "kiwix-serve");
+        if (File.Exists(candidate)) return candidate;
+
+        // 3) Repo-configured tools dir (paths.kiwix_tools_dir)
+        var cfgPath = Path.Combine(AppContext.BaseDirectory, "configs", "eowkit.toml");
+        try
+        {
+            if (File.Exists(cfgPath))
+            {
+                var line = File.ReadAllLines(cfgPath).FirstOrDefault(l => l.TrimStart().StartsWith("kiwix_tools_dir"));
+                if (line is not null)
+                {
+                    var eq = line.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var val = line[(eq+1)..].Trim().Trim('"');
+                        var p = Path.Combine(val, OperatingSystem.IsWindows() ? "kiwix-serve.exe" : "kiwix-serve");
+                        if (File.Exists(p)) return p;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // 4) Common locations
+        var candidates = new List<string>();
+        if (OperatingSystem.IsMacOS())
+        {
+            candidates.Add("/opt/homebrew/bin/kiwix-serve");
+            candidates.Add("/usr/local/bin/kiwix-serve");
+        }
+        else if (OperatingSystem.IsWindows())
+        {
+            candidates.Add("kiwix-serve.exe"); // rely on PATH
+        }
+        else
+        {
+            candidates.Add("/usr/bin/kiwix-serve");
+            candidates.Add("/usr/local/bin/kiwix-serve");
+        }
+
+        foreach (var p in candidates)
+        {
+            try
+            {
+                if (p.Contains("/")) { if (File.Exists(p)) return p; }
+                else
+                {
+                    // 5) which/where
+                    var tool = OperatingSystem.IsWindows() ? "where" : "which";
+                    var psi = new ProcessStartInfo(tool, OperatingSystem.IsWindows() ? "kiwix-serve.exe" : "kiwix-serve") { RedirectStandardOutput = true, UseShellExecute = false };
+                    var pr = Process.Start(psi);
+                    var outp = pr!.StandardOutput.ReadToEnd().Trim();
+                    pr.WaitForExit(2000);
+                    if (!string.IsNullOrWhiteSpace(outp))
+                    {
+                        var first = outp.Split('\n', '\r').FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))?.Trim();
+                        if (!string.IsNullOrWhiteSpace(first) && File.Exists(first)) return first;
+                    }
+                }
+            }
+            catch { /* ignore */ }
+        }
+
+        return null;
     }
 
     async Task<bool> IsAliveAsync()
