@@ -89,4 +89,60 @@ public static class Installer
 
         File.WriteAllLines(cfgPath, lines);
     }
+
+    // NEW: dedicated reranker flow (ask → download → set TOML)
+    public static async Task InstallRerankerAsync(string cfgPath)
+    {
+        var downloadsDir = Path.GetFullPath("models");
+        Directory.CreateDirectory(downloadsDir);
+
+        var choice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Select reranker build:")
+                .AddChoices("Standard (FP32, ~90–100 MB)", "Try INT8 Quantized (smaller, if available)")
+        );
+
+        var baseRepo = "https://huggingface.co/cross-encoder/ms-marco-MiniLM-L6-v2/resolve/main";
+        var onnxCandidates = new List<string>();
+
+        if (choice.StartsWith("Standard"))
+        {
+            onnxCandidates.Add($"{baseRepo}/onnx/model.onnx");
+        }
+        else
+        {
+            onnxCandidates.Add($"{baseRepo}/onnx/model_qint8.onnx");
+            onnxCandidates.Add($"{baseRepo}/onnx/model.int8.onnx");
+            onnxCandidates.Add($"{baseRepo}/onnx/model.quant.onnx");
+            onnxCandidates.Add($"{baseRepo}/onnx/model.onnx");
+        }
+
+        string onnxPath = "";
+        Exception? lastErr = null;
+        foreach (var u in onnxCandidates)
+        {
+            try
+            {
+                onnxPath = await EowKit.Core.Downloader.DownloadWithCacheAsync(u, downloadsDir, sha256: null);
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastErr = ex;
+            }
+        }
+        if (string.IsNullOrEmpty(onnxPath))
+            throw new Exception("Failed to download reranker ONNX.", lastErr);
+
+        var vocabUrl = $"{baseRepo}/vocab.txt";
+        var vocabPath = await EowKit.Core.Downloader.DownloadWithCacheAsync(vocabUrl, downloadsDir, sha256: null);
+
+        ConfigEditor.SetInSection(cfgPath, "reranker", "enabled", "true");
+        ConfigEditor.SetInSection(cfgPath, "reranker", "onnx_model", $"\"{onnxPath.Replace("\\", "/")}\"");
+        ConfigEditor.SetInSection(cfgPath, "reranker", "tokenizer_vocab", $"\"{vocabPath.Replace("\\", "/")}\"");
+        if (!File.ReadAllText(cfgPath).Contains("max_seq_len"))
+            ConfigEditor.SetInSection(cfgPath, "reranker", "max_seq_len", "256");
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Reranker enabled and configured in {cfgPath}");
+    }
 }

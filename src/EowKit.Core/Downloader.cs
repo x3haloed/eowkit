@@ -72,4 +72,34 @@ public static class Sha256Verifier
     }
 }
 
+public static class Downloader
+{
+    // Downloads to targetDir with caching by filename; verifies SHA256 if provided. Returns absolute path.
+    public static async Task<string> DownloadWithCacheAsync(string url, string targetDir, string? sha256)
+    {
+        Directory.CreateDirectory(targetDir);
+        var fileName = Path.GetFileName(new Uri(url).LocalPath);
+        var dest = Path.GetFullPath(Path.Combine(targetDir, fileName));
+
+        if (!File.Exists(dest))
+        {
+            await ResumableFetcher.DownloadAsync(url, dest);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sha256))
+        {
+            var ok = await Sha256Verifier.VerifyAsync(dest, sha256!);
+            if (!ok)
+            {
+                File.Delete(dest);
+                await ResumableFetcher.DownloadAsync(url, dest);
+                ok = await Sha256Verifier.VerifyAsync(dest, sha256!);
+                if (!ok) throw new Exception($"SHA256 mismatch for {fileName}");
+            }
+        }
+
+        return dest;
+    }
+}
+
 
