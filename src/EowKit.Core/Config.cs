@@ -65,6 +65,7 @@ public sealed class Config
             },
             Paths = new PathsSection
             {
+                DownloadsDir = (string?)paths?["downloads_dir"] ?? "",
                 ZimDir = (string?)paths?["zim_dir"] ?? "",
                 ModelsDir = (string?)paths?["models_dir"] ?? ""
             }
@@ -88,6 +89,7 @@ public sealed class Config
     }
     public sealed record PathsSection
     {
+        public string DownloadsDir { get; init; } = ""; // default: current directory
         public string ZimDir { get; init; } = "";     // default: current directory
         public string ModelsDir { get; init; } = "";  // default: current directory
     }

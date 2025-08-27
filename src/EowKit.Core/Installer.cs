@@ -9,10 +9,41 @@ public static class Installer
     {
         var cfg = Config.Load(cfgPath);
         var probe = await HardwareProbe.ProbeAsync();
-        var freeDisk = DiskProbe.GetFreeBytes(".");
 
-        AnsiConsole.MarkupLine($"[bold]Detected RAM[/]: {probe.TotalRamBytes/1_000_000_000.0:F1} GB, " +
-                               $"[bold]Free Disk[/]: {freeDisk/1_000_000_000.0:F1} GB");
+        // 0) Ask for directories (Enter to keep defaults)
+        var defaultDownloads = string.IsNullOrWhiteSpace(cfg.Paths.DownloadsDir) ? "downloads" : cfg.Paths.DownloadsDir;
+        var defaultZimDir    = string.IsNullOrWhiteSpace(cfg.Paths.ZimDir)       ? defaultDownloads : cfg.Paths.ZimDir;
+        var defaultModelsDir = string.IsNullOrWhiteSpace(cfg.Paths.ModelsDir)    ? "models" : cfg.Paths.ModelsDir;
+
+        var downloadsDirIn = AnsiConsole.Ask<string>("Downloads directory:", defaultDownloads);
+        var zimDirIn       = AnsiConsole.Ask<string>("ZIM storage directory:", defaultZimDir);
+        var modelsDirIn    = AnsiConsole.Ask<string>("Models directory (Ollama + reranker):", defaultModelsDir);
+
+        // Persist directories in config and ensure they exist
+        ConfigEditor.SetInSection(cfgPath, "paths", "downloads_dir", $"\"{downloadsDirIn.Replace("\\", "/")}\"");
+        ConfigEditor.SetInSection(cfgPath, "paths", "zim_dir", $"\"{zimDirIn.Replace("\\", "/")}\"");
+        ConfigEditor.SetInSection(cfgPath, "paths", "models_dir", $"\"{modelsDirIn.Replace("\\", "/")}\"");
+
+        var downloadsDir = Path.GetFullPath(downloadsDirIn);
+        var zimDir       = Path.GetFullPath(zimDirIn);
+        var modelsDir    = Path.GetFullPath(modelsDirIn);
+        Directory.CreateDirectory(downloadsDir);
+        Directory.CreateDirectory(zimDir);
+        Directory.CreateDirectory(modelsDir);
+
+        // Volume notes
+        var curRoot = Path.GetPathRoot(Path.GetFullPath("."));
+        void NoteVolume(string label, string dir)
+        {
+            var root = Path.GetPathRoot(dir);
+            if (!string.Equals(root, curRoot, StringComparison.OrdinalIgnoreCase))
+                AnsiConsole.MarkupLine($"[yellow]Note[/]: {label} is on a different volume: {root}");
+        }
+        NoteVolume("Downloads", downloadsDir);
+        NoteVolume("ZIM storage", zimDir);
+        NoteVolume("Models", modelsDir);
+
+        AnsiConsole.MarkupLine($"[bold]Detected RAM[/]: {probe.TotalRamBytes/1_000_000_000.0:F1} GB");
 
         // 1) Pick Wikipedia pack
         var wiki = AnsiConsole.Prompt(
@@ -22,8 +53,10 @@ public static class Installer
                 .AddChoices(catalog.Wikis)
                 .UseConverter(w => $"{w.Name}  (~{w.ApproxBytes/1_000_000_000.0:F0} GB)")
         );
-        if (wiki.ApproxBytes > freeDisk * 0.9) // 10% safety margin
-            AnsiConsole.MarkupLine($"[red]WARNING[/]: Snapshot likely too large for available disk.");
+        var finalWikiPath = Path.Combine(zimDir, wiki.Name);
+        var freeDiskWiki = DiskProbe.GetFreeBytes(finalWikiPath);
+        if (wiki.ApproxBytes > freeDiskWiki * 0.9) // 10% safety margin
+            AnsiConsole.MarkupLine($"[red]WARNING[/]: Snapshot likely too large for available disk at {Path.GetPathRoot(finalWikiPath)}.");
 
         // 2) Pick model
         var model = AnsiConsole.Prompt(
@@ -36,30 +69,45 @@ public static class Installer
         if (probe.TotalRamBytes < model.MinRamBytes)
             AnsiConsole.MarkupLine($"[red]WARNING[/]: Not enough RAM for {model.Id} (have {probe.TotalRamBytes/1_000_000_000.0:F1} GB, need {model.MinRamBytes/1_000_000_000.0:F1} GB).");
 
-        if (model.ApproxBytes > freeDisk * 0.9)
-            AnsiConsole.MarkupLine($"[red]WARNING[/]: Model may not fit on disk.");
+        var freeDiskModels = DiskProbe.GetFreeBytes(modelsDir);
+        if (model.ApproxBytes > freeDiskModels * 0.9)
+            AnsiConsole.MarkupLine($"[red]WARNING[/]: Model may not fit on disk at {Path.GetPathRoot(modelsDir)}.");
 
-        // 3) Downloads cache + resilient fetch
-        var cfgZimDir = string.IsNullOrWhiteSpace(cfg.Paths.ZimDir) ? "downloads" : cfg.Paths.ZimDir;
-        var zimDir = Path.GetFullPath(cfgZimDir);
-        Directory.CreateDirectory(zimDir);
-        AnsiConsole.MarkupLine($"\n[bold]ZIM directory[/]: {zimDir}");
+        // 3) Downloads cache + resilient fetch + copy to target dir
+        AnsiConsole.MarkupLine($"\n[bold]Downloads cache[/]: {downloadsDir}");
+        var stageZim = Path.Combine(downloadsDir, wiki.Name);
+        var wikiTarget = finalWikiPath;
 
-        var wikiTarget = Path.Combine(zimDir, wiki.Name);
-        if (!File.Exists(wikiTarget) || !await Sha256Verifier.VerifyAsync(wikiTarget, wiki.Sha256))
+        if (AnsiConsole.Confirm($"Download [bold]{wiki.Name}[/] now?"))
         {
-            AnsiConsole.MarkupLine("[grey]Fetching Wikipedia snapshot with resume + SHA256 verify...[/]");
-            await ResumableFetcher.DownloadAsync(wiki.Url, wikiTarget);
-            if (!string.IsNullOrWhiteSpace(wiki.Sha256))
+            if (!File.Exists(stageZim) || !await Sha256Verifier.VerifyAsync(stageZim, wiki.Sha256))
             {
-                var ok = await Sha256Verifier.VerifyAsync(wikiTarget, wiki.Sha256);
-                if (!ok)
-                    throw new Exception($"SHA256 mismatch for {wiki.Name}. Delete and retry.");
+                AnsiConsole.MarkupLine("[grey]Fetching Wikipedia snapshot with resume + SHA256 verify...[/]");
+                await ResumableFetcher.DownloadAsync(wiki.Url, stageZim);
+                if (!string.IsNullOrWhiteSpace(wiki.Sha256))
+                {
+                    var ok = await Sha256Verifier.VerifyAsync(stageZim, wiki.Sha256);
+                    if (!ok)
+                        throw new Exception($"SHA256 mismatch for {wiki.Name}. Delete and retry.");
+                }
             }
+            else
+            {
+                AnsiConsole.MarkupLine("[green]ZIM present in cache and verified.[/]");
+            }
+
+            if (!string.Equals(stageZim, wikiTarget, StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(wikiTarget)!);
+                File.Copy(stageZim, wikiTarget, overwrite: true);
+                AnsiConsole.MarkupLine($"[green]✓[/] Copied ZIM to {wikiTarget}");
+            }
+            ConfigEditor.SetInSection(cfgPath, "wiki", "zim", $"\"{wikiTarget.Replace("\\", "/")}\"");
         }
         else
         {
-            AnsiConsole.MarkupLine("[green]ZIM present and verified.[/]");
+            AnsiConsole.MarkupLine($"curl -fLO \"{wiki.Url}\"");
+            ConfigEditor.SetInSection(cfgPath, "wiki", "zim", $"\"{wikiTarget.Replace("\\", "/")}\"");
         }
 
         // Model fetch (instructions only; Ollama handles pull on run)
@@ -74,7 +122,7 @@ public static class Installer
 
         // 4) Patch config in-place
         ConfigPatcher(cfgPath, model.Id, wikiTarget);
-        AnsiConsole.MarkupLine($"\n[green]Updated[/] {cfgPath} with model={model.Id} and wiki.zim={wiki.Name}");
+        AnsiConsole.MarkupLine($"\n[green]Updated[/] {cfgPath} with model={model.Id} and wiki.zim={Path.GetFileName(wikiTarget)}");
     }
 
     static void ConfigPatcher(string cfgPath, string modelId, string wikiPath)
