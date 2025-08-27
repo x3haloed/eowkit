@@ -4,6 +4,7 @@ namespace EowKit.Core;
 
 public static class Installer
 {
+    // Downloads cache placed at ./downloads with SHA256 verification and resumable fetches
     public static async Task RunAsync(Catalog catalog, string cfgPath)
     {
         var cfg = Config.Load(cfgPath);
@@ -38,29 +39,40 @@ public static class Installer
         if (model.ApproxBytes > freeDisk * 0.9)
             AnsiConsole.MarkupLine($"[red]WARNING[/]: Model may not fit on disk.");
 
-        // 3) Show recommended commands (no brew)
-        AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[bold]Download commands (copy/paste):[/]");
+        // 3) Downloads cache + resilient fetch
+        var downloadsDir = Path.GetFullPath("downloads");
+        Directory.CreateDirectory(downloadsDir);
+        AnsiConsole.MarkupLine($"\n[bold]Downloads cache[/]: {downloadsDir}");
 
-        // Wikipedia fetch
-        AnsiConsole.MarkupLine($"[grey]# Wikipedia[/]");
-        AnsiConsole.MarkupLine($"curl -fLO \"{wiki.Url}\"");
-
-        // Model fetch (Ollama vs MLC)
-        if (model.Runner == "ollama")
+        var wikiTarget = Path.Combine(downloadsDir, wiki.Name);
+        if (!File.Exists(wikiTarget) || !await Sha256Verifier.VerifyAsync(wikiTarget, wiki.Sha256))
         {
-            AnsiConsole.MarkupLine($"[grey]# Ollama[/]");
-            AnsiConsole.MarkupLine("curl -fsSL https://ollama.com/install.sh | sh");
-            AnsiConsole.MarkupLine($"ollama pull {model.Id}");
+            AnsiConsole.MarkupLine("[grey]Fetching Wikipedia snapshot with resume + SHA256 verify...[/]");
+            await ResumableFetcher.DownloadAsync(wiki.Url, wikiTarget);
+            if (!string.IsNullOrWhiteSpace(wiki.Sha256))
+            {
+                var ok = await Sha256Verifier.VerifyAsync(wikiTarget, wiki.Sha256);
+                if (!ok)
+                    throw new Exception($"SHA256 mismatch for {wiki.Name}. Delete and retry.");
+            }
         }
         else
         {
-            AnsiConsole.MarkupLine($"[grey]# MLC (mobile artifact)[/]");
-            AnsiConsole.MarkupLine($"# Visit: https://huggingface.co/{model.Id}");
+            AnsiConsole.MarkupLine("[green]ZIM present and verified.[/]");
+        }
+
+        // Model fetch (instructions only; Ollama handles pull on run)
+        if (model.Runner == "ollama")
+        {
+            AnsiConsole.MarkupLine($"[grey]Model runner[/]: Ollama. The model will be pulled on first run if missing.");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[grey]MLC note[/]: Download mobile artifact from https://huggingface.co/{model.Id}");
         }
 
         // 4) Patch config in-place
-        ConfigPatcher(cfgPath, model.Id, wiki.Name);
+        ConfigPatcher(cfgPath, model.Id, wikiTarget);
         AnsiConsole.MarkupLine($"\n[green]Updated[/] {cfgPath} with model={model.Id} and wiki.zim={wiki.Name}");
     }
 
@@ -73,7 +85,7 @@ public static class Installer
         if (i >= 0) lines[i] = $"ollama = \"{modelId}\"";
 
         i = lines.FindIndex(l => l.Contains("zim ="));
-        if (i >= 0) lines[i] = $"zim = \"/data/{wikiName}\"";
+        if (i >= 0) lines[i] = $"zim = \"{wikiName}\"";
 
         File.WriteAllLines(cfgPath, lines);
     }

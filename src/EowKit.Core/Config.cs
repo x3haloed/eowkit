@@ -11,6 +11,7 @@ public sealed class Config
     public LlmSection Llm { get; init; } = new();
     public RetrievalSection Retrieval { get; init; } = new();
     public PromptSection Prompt { get; init; } = new();
+    public RerankerSection Reranker { get; init; } = new();
 
     public static Config Load(string path)
     {
@@ -27,6 +28,7 @@ public sealed class Config
         var ret = (TomlTable)doc["retrieval"];
 
         var prompt = (TomlTable)doc["prompt"];
+        var rr = (TomlTable)doc["reranker"];
 
         var cfg = new Config
         {
@@ -50,7 +52,14 @@ public sealed class Config
                 MaxArticles = Convert.ToInt32(ret["max_articles"]),
                 Rerank = Convert.ToBoolean(ret["rerank"])
             },
-            Prompt = new PromptSection { System = (string?)prompt["system"] ?? "" }
+            Prompt = new PromptSection { System = (string?)prompt["system"] ?? "" },
+            Reranker = new RerankerSection
+            {
+                Enabled = Convert.ToBoolean(rr["enabled"]),
+                OnnxModel = (string?)rr["onnx_model"] ?? "",
+                TokenizerVocab = (string?)rr["tokenizer_vocab"] ?? "",
+                MaxSeqLen = Convert.ToInt32(rr["max_seq_len"]) 
+            }
         };
 
         return cfg;
@@ -62,4 +71,11 @@ public sealed class Config
     public sealed record LlmSection { public string OllamaUrl { get; init; } = "http://127.0.0.1:11434"; public int ContextTokens { get; init; } = 4096; public double Temperature { get; init; } = 0.2; }
     public sealed record RetrievalSection { public int K { get; init; } = 40; public int MaxArticles { get; init; } = 5; public bool Rerank { get; init; } = false; }
     public sealed record PromptSection { public string System { get; init; } = ""; }
+    public sealed record RerankerSection
+    {
+        public bool Enabled { get; init; }
+        public string OnnxModel { get; init; } = "";
+        public string TokenizerVocab { get; init; } = "";
+        public int MaxSeqLen { get; init; } = 256;
+    }
 }

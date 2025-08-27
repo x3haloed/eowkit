@@ -23,8 +23,9 @@ public sealed class Catalog
         }
         foreach (TomlTable w in (TomlTableArray)doc["wikis"])
         {
+            var sha = w.TryGetValue("sha256", out var s) ? (string?)s ?? string.Empty : string.Empty;
             cat.Wikis.Add(new WikiItem(
-                (string)w["name"], (string)w["url"], Convert.ToInt64(w["approx_bytes"])
+                (string)w["name"], (string)w["url"], Convert.ToInt64(w["approx_bytes"]), sha
             ));
         }
         if (doc.TryGetValue("sources", out var sourcesObj))
@@ -38,6 +39,6 @@ public sealed class Catalog
     }
 
     public sealed record ModelItem(string Id, string Runner, string Precision, long ApproxBytes, long MinRamBytes);
-    public sealed record WikiItem(string Name, string Url, long ApproxBytes);
+    public sealed record WikiItem(string Name, string Url, long ApproxBytes, string Sha256);
     public sealed record SourceItem(string Label, string Url);
 }

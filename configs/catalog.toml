@@ -44,16 +44,19 @@ min_ram_bytes = 7000000000
 name = "wikipedia_en_all_nopic_2025-08.zim"
 url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2025-08.zim"
 approx_bytes = 46000000000
+sha256 = "f8ff1e22cc2d1811620837ffb07d9bf85fdd1e4e7659f4d80c481337b52a62b1"
 
 [[wikis]]
 name = "wikipedia_en_all_maxi_2025-08.zim"
 url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2025-08.zim"
 approx_bytes = 119000000000
+sha256 = "3aa55399c5afa6eb5c2477194e0d022c0527616408bc644c2224ed328da62dfb"
 
 [[wikis]]
 name = "wikipedia_en_mini_2025-08.zim"
-url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_mini_2025-08.zim"
+url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_mini_2025-06.zim"
 approx_bytes = 13000000000
+sha256 = "e9709b6f687eae6d268a73f7b68aa3ac3e47ba076f7fe9f7a15e0ae019814a78"
 
 # Fallback mirrors or torrents—user can add/override these; installer tries all.
 [[sources]]

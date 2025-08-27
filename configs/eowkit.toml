@@ -21,6 +21,12 @@ k = 40
 max_articles = 5
 rerank = false
 
+[reranker]
+enabled = false
+onnx_model = "models/cross-encoder-msmarco-MiniLM-L-6-v2.onnx"   # ~80-100MB
+tokenizer_vocab = "models/vocab.txt"                             # BERT WordPiece
+max_seq_len = 256
+
 [prompt]
 system = """
 You are an offline encyclopedia assistant. Always call tools to search the local Wikipedia snapshot before answering.
