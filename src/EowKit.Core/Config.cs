@@ -12,6 +12,7 @@ public sealed class Config
     public RetrievalSection Retrieval { get; init; } = new();
     public PromptSection Prompt { get; init; } = new();
     public RerankerSection Reranker { get; init; } = new();
+    public PathsSection Paths { get; init; } = new();
 
     public static Config Load(string path)
     {
@@ -29,6 +30,8 @@ public sealed class Config
 
         var prompt = (TomlTable)doc["prompt"];
         var rr = (TomlTable)doc["reranker"];
+        TomlTable? paths = null;
+        if (doc.ContainsKey("paths")) paths = (TomlTable)doc["paths"];        
 
         var cfg = new Config
         {
@@ -59,6 +62,11 @@ public sealed class Config
                 OnnxModel = (string?)rr["onnx_model"] ?? "",
                 TokenizerVocab = (string?)rr["tokenizer_vocab"] ?? "",
                 MaxSeqLen = Convert.ToInt32(rr["max_seq_len"]) 
+            },
+            Paths = new PathsSection
+            {
+                ZimDir = (string?)paths?["zim_dir"] ?? "",
+                ModelsDir = (string?)paths?["models_dir"] ?? ""
             }
         };
 
@@ -77,5 +85,10 @@ public sealed class Config
         public string OnnxModel { get; init; } = "";
         public string TokenizerVocab { get; init; } = "";
         public int MaxSeqLen { get; init; } = 256;
+    }
+    public sealed record PathsSection
+    {
+        public string ZimDir { get; init; } = "";     // default: current directory
+        public string ModelsDir { get; init; } = "";  // default: current directory
     }
 }

@@ -57,7 +57,7 @@ switch (command)
         var kiwix = new KiwixClient(cfg.Wiki.Bind, cfg.Wiki.KiwixPort);
         await kiwix.EnsureServeAsync(cfg.Wiki.Zim);
 
-        var ollama = new OllamaClient(cfg.Llm.OllamaUrl);
+        var ollama = new OllamaClient(cfg.Llm.OllamaUrl, string.IsNullOrWhiteSpace(cfg.Paths.ModelsDir) ? null : cfg.Paths.ModelsDir);
         await ollama.EnsureServeAsync();
         await ollama.EnsureModelAsync(cfg.Model.Ollama);
 

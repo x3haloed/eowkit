@@ -9,11 +9,13 @@ public sealed class OllamaClient
 {
     private readonly HttpClient _http = new();
     private readonly string _base;
+    private readonly string? _modelsDir;
 
-    public OllamaClient(string baseUrl)
+    public OllamaClient(string baseUrl, string? modelsDir = null)
     {
         _base = baseUrl.TrimEnd('/');
         _http.Timeout = TimeSpan.FromMinutes(5);
+        _modelsDir = string.IsNullOrWhiteSpace(modelsDir) ? null : modelsDir;
     }
 
     public async Task EnsureServeAsync()
@@ -25,6 +27,11 @@ public sealed class OllamaClient
         {
             UseShellExecute = false, CreateNoWindow = true
         };
+        if (!string.IsNullOrWhiteSpace(_modelsDir))
+        {
+            Directory.CreateDirectory(_modelsDir);
+            psi.Environment["OLLAMA_MODELS"] = _modelsDir;
+        }
         Process.Start(psi);
 
         for (int i=0;i<30;i++)

@@ -40,11 +40,12 @@ public static class Installer
             AnsiConsole.MarkupLine($"[red]WARNING[/]: Model may not fit on disk.");
 
         // 3) Downloads cache + resilient fetch
-        var downloadsDir = Path.GetFullPath("downloads");
-        Directory.CreateDirectory(downloadsDir);
-        AnsiConsole.MarkupLine($"\n[bold]Downloads cache[/]: {downloadsDir}");
+        var cfgZimDir = string.IsNullOrWhiteSpace(cfg.Paths.ZimDir) ? "downloads" : cfg.Paths.ZimDir;
+        var zimDir = Path.GetFullPath(cfgZimDir);
+        Directory.CreateDirectory(zimDir);
+        AnsiConsole.MarkupLine($"\n[bold]ZIM directory[/]: {zimDir}");
 
-        var wikiTarget = Path.Combine(downloadsDir, wiki.Name);
+        var wikiTarget = Path.Combine(zimDir, wiki.Name);
         if (!File.Exists(wikiTarget) || !await Sha256Verifier.VerifyAsync(wikiTarget, wiki.Sha256))
         {
             AnsiConsole.MarkupLine("[grey]Fetching Wikipedia snapshot with resume + SHA256 verify...[/]");
@@ -76,7 +77,7 @@ public static class Installer
         AnsiConsole.MarkupLine($"\n[green]Updated[/] {cfgPath} with model={model.Id} and wiki.zim={wiki.Name}");
     }
 
-    static void ConfigPatcher(string cfgPath, string modelId, string wikiName)
+    static void ConfigPatcher(string cfgPath, string modelId, string wikiPath)
     {
         var lines = File.ReadAllLines(cfgPath).ToList();
         int i;
@@ -85,7 +86,7 @@ public static class Installer
         if (i >= 0) lines[i] = $"ollama = \"{modelId}\"";
 
         i = lines.FindIndex(l => l.Contains("zim ="));
-        if (i >= 0) lines[i] = $"zim = \"{wikiName}\"";
+        if (i >= 0) lines[i] = $"zim = \"{wikiPath.Replace("\\", "/")}\"";
 
         File.WriteAllLines(cfgPath, lines);
     }
@@ -93,7 +94,9 @@ public static class Installer
     // NEW: dedicated reranker flow (ask → download → set TOML)
     public static async Task InstallRerankerAsync(string cfgPath)
     {
-        var downloadsDir = Path.GetFullPath("models");
+        var cfg = Config.Load(cfgPath);
+        var cfgModelsDir = string.IsNullOrWhiteSpace(cfg.Paths.ModelsDir) ? "models" : cfg.Paths.ModelsDir;
+        var downloadsDir = Path.GetFullPath(cfgModelsDir);
         Directory.CreateDirectory(downloadsDir);
 
         var choice = AnsiConsole.Prompt(
