@@ -11,6 +11,25 @@ EoWKit downloads a copy of Wikipedia and an offline LLM to your computer so you 
 eowkit install
 ```
 
+Unsigned builds (macOS and Windows):
+
+- macOS (Gatekeeper)
+  - On first run you may see: "'eowkit' cannot be opened because it is from an unidentified developer."
+  - Do one of the following once:
+    - Finder: right‑click `eowkit` → Open → Open
+    - System Settings → Privacy & Security → Open Anyway for the blocked app
+    - Terminal:
+      ```
+      xattr -dr com.apple.quarantine /path/to/eowkit
+      ```
+  - After the first successful open, it should run normally.
+
+- Windows (SmartScreen/Defender)
+  - You may see: "Windows protected your PC" (SmartScreen).
+  - Click More info → Run anyway. If the file shows as blocked:
+    - Right‑click `eowkit.exe` → Properties → check "Unblock" → Apply → OK
+  - After that, it should launch normally.
+
 - Prompts for directories: downloads, ZIM storage, models (OLLAMA_MODELS)
 - Lets you choose the Wikipedia snapshot and LLM model
 - Warns if RAM is too low or target disk is nearly full (90% rule)
