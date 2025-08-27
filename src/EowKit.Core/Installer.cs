@@ -46,12 +46,18 @@ public static class Installer
         // Ensure local kiwix-serve in models/tools to make binary portable
         var toolsDir = Path.Combine(modelsDir, "tools");
         await KiwixToolsInstaller.EnsureKiwixServeAsync(toolsDir, downloadsDir);
+        var kiwixServeBin = Path.Combine(toolsDir, OperatingSystem.IsWindows() ? "kiwix-serve.exe" : "kiwix-serve");
         ConfigEditor.SetInSection(cfgPath, "paths", "kiwix_tools_dir", $"\"{toolsDir.Replace("\\", "/")}\"");
+        if (File.Exists(kiwixServeBin))
+            ConfigEditor.SetInSection(cfgPath, "paths", "kiwix_serve_bin", $"\"{kiwixServeBin.Replace("\\", "/")}\"");
 
         // Ensure local ollama CLI so we can run without system install
         var ollamaDir = Path.Combine(modelsDir, "ollama");
         await OllamaInstaller.EnsureOllamaAsync(ollamaDir, downloadsDir);
+        var ollamaBin = Path.Combine(ollamaDir, OperatingSystem.IsWindows() ? "ollama.exe" : "ollama");
         ConfigEditor.SetInSection(cfgPath, "paths", "ollama_dir", $"\"{ollamaDir.Replace("\\", "/")}\"");
+        if (File.Exists(ollamaBin))
+            ConfigEditor.SetInSection(cfgPath, "paths", "ollama_bin", $"\"{ollamaBin.Replace("\\", "/")}\"");
 
         AnsiConsole.MarkupLine($"[bold]Detected RAM[/]: {probe.TotalRamBytes/1_000_000_000.0:F1} GB");
 

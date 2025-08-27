@@ -75,7 +75,10 @@ public sealed class Config
                 DownloadsDir = (string?)paths?["downloads_dir"] ?? "",
                 ZimDir = (string?)paths?["zim_dir"] ?? "",
                 ModelsDir = (string?)paths?["models_dir"] ?? "",
-                KiwixToolsDir = (string?)paths?["kiwix_tools_dir"] ?? ""
+                KiwixToolsDir = (string?)paths?["kiwix_tools_dir"] ?? "",
+                KiwixServeBin = (string?)paths?["kiwix_serve_bin"] ?? "",
+                OllamaDir = (string?)paths?["ollama_dir"] ?? "",
+                OllamaBin = (string?)paths?["ollama_bin"] ?? ""
             }
         };
 
@@ -102,5 +105,8 @@ public sealed class Config
         public string ZimDir { get; init; } = "";     // default: current directory
         public string ModelsDir { get; init; } = "";  // default: current directory
         public string KiwixToolsDir { get; init; } = "";  // where kiwix-serve is placed locally
+        public string KiwixServeBin { get; init; } = "";  // explicit kiwix-serve path if bundled
+        public string OllamaDir { get; init; } = "";      // where ollama is placed locally
+        public string OllamaBin { get; init; } = "";      // explicit ollama path if bundled
     }
 }

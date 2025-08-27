@@ -69,7 +69,18 @@ public sealed class KiwixClient
         {
             if (File.Exists(cfgPath))
             {
-                var line = File.ReadAllLines(cfgPath).FirstOrDefault(l => l.TrimStart().StartsWith("kiwix_tools_dir"));
+                var lines = File.ReadAllLines(cfgPath);
+                var explicitBin = lines.FirstOrDefault(l => l.TrimStart().StartsWith("kiwix_serve_bin"));
+                if (explicitBin is not null)
+                {
+                    var eq = explicitBin.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var val = explicitBin[(eq+1)..].Trim().Trim('"');
+                        if (File.Exists(val)) return val;
+                    }
+                }
+                var line = lines.FirstOrDefault(l => l.TrimStart().StartsWith("kiwix_tools_dir"));
                 if (line is not null)
                 {
                     var eq = line.IndexOf('=');

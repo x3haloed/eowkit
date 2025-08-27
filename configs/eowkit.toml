@@ -6,6 +6,22 @@ ollama = "llama3.1:8b-instruct-fp16"
 # For phone builds (MLC). Optional here; the installer will present choices.
 mlc_model = "mlc-ai/Llama-3.2-1B-Instruct-q0f16-MLC"
 
+[paths]
+# Where large downloads are staged (archives/ZIMs). Used by the installer.
+downloads_dir = "downloads"
+# Where .zim files live (final location). The installer copies here from downloads_dir.
+zim_dir       = "downloads"
+# Where Ollama models and local tools live.
+models_dir    = "models"
+# Local kiwix-tools placement (if downloaded); kiwix-serve will be copied here.
+kiwix_tools_dir = "models/tools"
+# Set by installer if a local kiwix-serve was placed (absolute path to binary). Leave empty to auto-detect.
+kiwix_serve_bin = ""
+# Local Ollama placement (if downloaded). The binary and lib/ will be copied here.
+ollama_dir = "models/ollama"
+# Set by installer if a local ollama binary was placed (absolute path to binary). Leave empty to auto-detect.
+ollama_bin = ""
+
 [wiki]
 zim = "/data/wikipedia_en_all_nopic_2025-08.zim"
 kiwix_port = 8080

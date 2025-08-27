@@ -52,6 +52,16 @@ public sealed class OllamaClient
             if (File.Exists(cfgPath))
             {
                 var lines = File.ReadAllLines(cfgPath);
+                var explicitBin = lines.FirstOrDefault(x => x.TrimStart().StartsWith("ollama_bin"));
+                if (explicitBin is not null)
+                {
+                    var eq = explicitBin.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        var root = explicitBin[(eq+1)..].Trim().Trim('"');
+                        if (File.Exists(root)) return root;
+                    }
+                }
                 var l = lines.FirstOrDefault(x => x.TrimStart().StartsWith("ollama_dir"));
                 if (l is not null)
                 {
