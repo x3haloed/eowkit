@@ -1,17 +1,25 @@
-1) Download a release for your architecture
-2) Run setup
+# End-of-the-World Kit
+When your internet connection is censored or disabled, you will want to learn things like how to effectively grow your own food.
 
+EoWKit downloads a copy of Wikipedia and an offline LLM to your computer so you can still get answers to hard problems, even when you've been cut off from the internet.
+
+## Getting Started
+
+### 1) Download a release for your architecture
+### 2) Run setup
+```
 eowkit install
+```
 
 - Prompts for directories: downloads, ZIM storage, models (OLLAMA_MODELS)
 - Lets you choose the Wikipedia snapshot and LLM model
 - Warns if RAM is too low or target disk is nearly full (90% rule)
 - Offers to enable the reranker and auto-download ONNX + vocab
 
-3) (Optional) Put the big files on another drive
+### 3) (Optional) Put the big files on another drive
 
-Edit configs/eowkit.toml — TOML, not YAML.
-
+Edit configs/eowkit.toml
+```toml
 [paths]
 downloads_dir = "/mnt/downloads"          # where large downloads land
 zim_dir       = "/mnt/wiki"               # where .zim files live
@@ -22,26 +30,28 @@ library_xml   = "/mnt/wiki/library.xml"   # optional: serve many ZIMs
 zim = "wikipedia_en_all_nopic_2025-08.zim"  # resolved under paths.zim_dir
 kiwix_port = 8080
 bind = "127.0.0.1"
-
+```
 To serve many ZIMs:
-
+```
 kiwix-manage /mnt/wiki/library.xml add /mnt/wiki/*.zim
+```
 
 Set paths.library_xml and leave wiki.zim as-is (it’ll be ignored when a library is present).
 
-5) First run
-
+### 4) First run
+```
 eowkit run
-# starts kiwix-serve on your ZIM (or library), ensures Ollama + model, drops you into a prompt
-# type questions; Ctrl-C to exit
+```
+- starts kiwix-serve on your ZIM (or library), ensures Ollama + model, drops you into a prompt
+- type questions; Ctrl-C to exit
 
-4) (Optional) Enable the reranker anytime
+### 5) (Optional) Enable the reranker anytime
 
 eowkit install-reranker
 
 This downloads a cross-encoder ONNX model + vocab into models_dir and flips TOML:
 
-```
+```toml
 [reranker]
 enabled = true
 onnx_model = "models/ce-minilm-l6.onnx"
@@ -54,7 +64,7 @@ max_seq_len = 256
 - Installer prints a hint for model sizing and sets a sane default thread count
 - Override threads as needed:
 
-```
+```toml
 [llm_runtime]
 num_threads = 8
 ```
