@@ -1,0 +1,69 @@
+[[models]]
+id = "llama3.1:70b-instruct-fp16"
+runner = "ollama"
+precision = "fp16"
+approx_bytes = 151000000000      # file + headroom (≈141 GB weights + margin)
+min_ram_bytes = 170000000000     # ~170 GB recommended
+
+[[models]]
+id = "llama3.1:8b-instruct-fp16"
+runner = "ollama"
+precision = "fp16"
+approx_bytes = 17000000000       # ~17 GB
+min_ram_bytes = 22000000000      # ~22 GB suggested
+
+[[models]]
+id = "qwen2.5:7b-instruct-q8_0"
+runner = "ollama"
+precision = "q8_0"
+approx_bytes = 9000000000        # ~9 GB
+min_ram_bytes = 12000000000      # ~12 GB suggested
+
+[[models]]
+id = "phi3:mini-3.8b-q8_0"
+runner = "ollama"
+precision = "q8_0"
+approx_bytes = 5000000000        # ~5 GB
+min_ram_bytes = 8000000000       # ~8 GB suggested
+
+[[models]]
+id = "mlc-ai/Llama-3.2-1B-Instruct-q0f16-MLC"
+runner = "mlc"
+precision = "fp16"
+approx_bytes = 2500000000        # ~2.5 GB phone/tablet artifact
+min_ram_bytes = 3000000000
+
+[[models]]
+id = "mlc-ai/Llama-3.2-3B-Instruct-q0f16-MLC"
+runner = "mlc"
+precision = "fp16"
+approx_bytes = 6000000000
+min_ram_bytes = 7000000000
+
+[[wikis]]
+name = "wikipedia_en_all_nopic_2025-08.zim"
+url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2025-08.zim"
+approx_bytes = 46000000000
+
+[[wikis]]
+name = "wikipedia_en_all_maxi_2025-08.zim"
+url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2025-08.zim"
+approx_bytes = 119000000000
+
+[[wikis]]
+name = "wikipedia_en_mini_2025-08.zim"
+url = "https://download.kiwix.org/zim/wikipedia/wikipedia_en_mini_2025-08.zim"
+approx_bytes = 13000000000
+
+# Fallback mirrors or torrents—user can add/override these; installer tries all.
+[[sources]]
+label = "Kiwix primary"
+url = "https://download.kiwix.org/zim/wikipedia/"
+
+[[sources]]
+label = "Mirror (Fau)"
+url = "https://ftp.fau.de/kiwix/zim/wikipedia/"
+
+[[sources]]
+label = "IPFS gateway (user-provided CID)"
+url = "ipfs://<CID>"

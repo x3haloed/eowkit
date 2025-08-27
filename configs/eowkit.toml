@@ -1,0 +1,28 @@
+[model]
+# Ollama model name or empty if using mobile MLC only
+ollama = "llama3.1:8b-instruct-fp16"
+
+[mobile]
+# For phone builds (MLC). Optional here; the installer will present choices.
+mlc_model = "mlc-ai/Llama-3.2-1B-Instruct-q0f16-MLC"
+
+[wiki]
+zim = "/data/wikipedia_en_all_nopic_2025-08.zim"
+kiwix_port = 8080
+bind = "127.0.0.1"
+
+[llm]
+ollama_url = "http://127.0.0.1:11434"
+context_tokens = 4096
+temperature = 0.2
+
+[retrieval]
+k = 40
+max_articles = 5
+rerank = false
+
+[prompt]
+system = """
+You are an offline encyclopedia assistant. Always call tools to search the local Wikipedia snapshot before answering.
+Cite article titles. If nothing is found, say 'No support found in this offline snapshot.'
+"""
