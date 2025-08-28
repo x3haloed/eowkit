@@ -18,6 +18,9 @@ Tested  Feature
 ## Getting Started
 
 ### 1) Download a release for your architecture
+
+Download [the latest release](https://github.com/x3haloed/eowkit/releases) for your OS under Assets.
+
 ### 2) Run setup
 ```
 eowkit install
