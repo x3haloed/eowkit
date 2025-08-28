@@ -1,13 +1,17 @@
 # End-of-the-World Kit
 When your internet connection is censored or disabled, you will want to learn things like how to effectively grow your own food.
 
+<img width="1170" height="740" alt="image" src="https://github.com/user-attachments/assets/fcc20dd4-dea8-4090-b586-b4d5b107c559" />
+
 EoWKit downloads a copy of Wikipedia and an offline LLM to your computer so you can still get answers to hard problems, even when you've been cut off from the internet.
 
 ## Project Status
 
 Tested  Feature
 ✅  macOS, wikipedia_en_all_mini_2025-06.zim, phi3:mini, reranker=NO
+
 ❌  Windows
+
 ❌  Linux
 
 ## Getting Started
