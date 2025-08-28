@@ -34,7 +34,7 @@ approx_bytes = 9000000000        # ~9 GB
 min_ram_bytes = 12000000000      # ~12 GB suggested
 
 [[models]]
-id = "phi3:mini-3.8b-q8_0"
+id = "phi3:mini"
 runner = "ollama"
 precision = "q8_0"
 approx_bytes = 5000000000        # ~5 GB
