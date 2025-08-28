@@ -8,6 +8,7 @@ EoWKit downloads a copy of Wikipedia and an offline LLM to your computer so you 
 ## Project Status
 
 Tested  Feature
+
 ✅  macOS, wikipedia_en_all_mini_2025-06.zim, phi3:mini, reranker=NO
 
 ❌  Windows
