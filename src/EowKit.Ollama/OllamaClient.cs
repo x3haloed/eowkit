@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,7 +9,7 @@ namespace EowKit.Ollama;
 public sealed class OllamaClient
 {
     private readonly HttpClient _http = new();
-    private readonly string _base;
+    private string _base;
     private readonly string? _modelsDir;
     private Process? _serveProcess;
 
@@ -21,8 +22,9 @@ public sealed class OllamaClient
 
     public async Task EnsureServeAsync()
     {
-        // Try a ping; if fail, start `ollama serve`
-        if (await PingAsync()) return;
+        // Always start a private quiet server on a free port to minimize logs
+        var port = GetFreeTcpPort();
+        _base = $"http://127.0.0.1:{port}";
 
         var exe = ResolveOllamaPath() ?? "ollama";
         var psi = new ProcessStartInfo(exe, "serve")
@@ -33,6 +35,7 @@ public sealed class OllamaClient
             RedirectStandardError = true
         };
         psi.Environment["OLLAMA_DEBUG"] = "ERROR";
+        psi.Environment["OLLAMA_HOST"] = $"127.0.0.1:{port}";
         if (!string.IsNullOrWhiteSpace(_modelsDir))
         {
             Directory.CreateDirectory(_modelsDir);
@@ -46,12 +49,21 @@ public sealed class OllamaClient
         p.BeginOutputReadLine();
         p.BeginErrorReadLine();
 
-        for (int i=0;i<30;i++)
+        for (int i=0;i<60;i++)
         {
             if (await PingAsync()) return;
             await Task.Delay(500);
         }
         throw new Exception("ollama serve did not start");
+    }
+
+    private static int GetFreeTcpPort()
+    {
+        var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 
     static string? ResolveOllamaPath()
@@ -142,13 +154,13 @@ public sealed class OllamaClient
                     if (total > 0)
                     {
                         var pct = completed * 100.0 / total;
-                        if (Math.Abs(pct - lastPct) >= 1.0) { shouldEmit = true; lastPct = pct; }
+                        if (Math.Abs(pct - lastPct) >= 5.0) { shouldEmit = true; lastPct = pct; }
                     }
                     if (!shouldEmit && (!string.Equals(status, lastStatus, StringComparison.Ordinal) || !string.Equals(digest, lastDigest, StringComparison.Ordinal)))
                     {
                         shouldEmit = true;
                     }
-                    if (!shouldEmit && (DateTime.UtcNow - lastEmit).TotalSeconds >= 2)
+                    if (!shouldEmit && (DateTime.UtcNow - lastEmit).TotalSeconds >= 5)
                     {
                         shouldEmit = true;
                     }
@@ -159,21 +171,20 @@ public sealed class OllamaClient
                         lastStatus = status; lastDigest = digest;
                         if (total > 0)
                         {
-                            progress?.Invoke($"pull {status} {digest} {completed}/{total} ({(completed*100.0/total):F1}%)");
+                            progress?.Invoke($"pull {status} {(completed*100.0/Math.Max(total,1)):F0}%");
                         }
-                        else if (!string.IsNullOrEmpty(status) || !string.IsNullOrEmpty(digest))
+                        else if (!string.IsNullOrEmpty(status))
                         {
-                            progress?.Invoke($"pull {status} {digest}");
+                            progress?.Invoke($"pull {status}");
                         }
                     }
                 }
                 catch
                 {
-                    // rare non-JSON line; throttle
-                    if ((DateTime.UtcNow - lastEmit).TotalSeconds >= 2)
+                    if ((DateTime.UtcNow - lastEmit).TotalSeconds >= 5)
                     {
                         lastEmit = DateTime.UtcNow;
-                        progress?.Invoke(line);
+                        progress?.Invoke("pull ...");
                     }
                 }
             }
