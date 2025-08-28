@@ -3,6 +3,13 @@ When your internet connection is censored or disabled, you will want to learn th
 
 EoWKit downloads a copy of Wikipedia and an offline LLM to your computer so you can still get answers to hard problems, even when you've been cut off from the internet.
 
+## Project Status
+
+Tested  Feature
+✅  macOS, wikipedia_en_all_mini_2025-06.zim, phi3:mini, reranker=NO
+❌  Windows
+❌  Linux
+
 ## Getting Started
 
 ### 1) Download a release for your architecture
