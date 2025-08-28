@@ -9,8 +9,8 @@ min_ram_bytes = 170000000000     # ~170 GB recommended
 id = "gpt-oss:120b"
 runner = "ollama"
 precision = "mxfp4"
-approx_bytes = 65000000000 ~65 GB model file (Ollama tag)
-min_ram_bytes = 128000000000 GPU VRAM ≥80 GB recommended.
+approx_bytes = 65000000000      # ~65 GB model file (Ollama tag)
+min_ram_bytes = 128000000000    # GPU VRAM ≥80 GB recommended.
 
 [[models]]
 id = "llama3.1:8b-instruct-fp16"
