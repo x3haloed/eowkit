@@ -13,6 +13,13 @@ approx_bytes = 17000000000       # ~17 GB
 min_ram_bytes = 22000000000      # ~22 GB suggested
 
 [[models]]
+id = "gpt-oss:20b"
+runner = "ollama"
+precision = "fp16/mixed"
+approx_bytes = 15000000000      # ~14–15 GB on disk (Ollama tag)
+min_ram_bytes = 16000000000     # 16 GB minimum; 1.2× is ideal for VRAM
+
+[[models]]
 id = "qwen2.5:7b-instruct-q8_0"
 runner = "ollama"
 precision = "q8_0"
