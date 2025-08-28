@@ -52,8 +52,10 @@ public static class KiwixToolsInstaller
 
     static (string url, bool isZip, string innerBinaryPath) ComposeBestUrl()
     {
-        // Prefer latest known version; fall back to previous
-        var versions = new[] { "3.7.0", "3.6.0" };
+        // Prefer a stable version on macOS due to mmap issues in 3.7.0; otherwise prefer latest
+        var versions = RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            ? new[] { "3.6.0", "3.7.0" }
+            : new[] { "3.7.0", "3.6.0" };
 
         foreach (var ver in versions)
         {
