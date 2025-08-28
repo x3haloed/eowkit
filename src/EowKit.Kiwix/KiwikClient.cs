@@ -30,7 +30,8 @@ public sealed class KiwixClient
             throw new Exception(msg);
         }
 
-        var psi = new ProcessStartInfo(servePath, $"--port={_port} \"{zimPath}\"")
+        var addressArg = NeedsExplicitBind(_host) ? $" --address={_host}" : string.Empty;
+        var psi = new ProcessStartInfo(servePath, $"--port={_port}{addressArg} \"{zimPath}\"")
         {
             UseShellExecute = false, CreateNoWindow = true
         };
@@ -44,7 +45,7 @@ public sealed class KiwixClient
         }
 
         // wait a moment for server to bind
-        for (int i=0;i<15;i++)
+        for (int i=0;i<60;i++)
         {
             if (await IsAliveAsync()) return;
             await Task.Delay(500);
@@ -142,11 +143,22 @@ public sealed class KiwixClient
     {
         try
         {
-            var url = $"http://{_host}:{_port}/search?pattern=test&content=html";
-            using var r = await _http.GetAsync(url);
-            return r.IsSuccessStatusCode;
+            var connectHost = ResolveClientHost(_host);
+            var rootUrl = $"http://{connectHost}:{_port}/";
+            using (var r1 = await _http.GetAsync(rootUrl, HttpCompletionOption.ResponseHeadersRead))
+            {
+                var code = (int)r1.StatusCode;
+                if (code >= 200 && code < 400) return true;
+            }
+
+            var url = $"http://{connectHost}:{_port}/search?pattern=test&content=html";
+            using (var r2 = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+            {
+                if (r2.IsSuccessStatusCode) return true;
+            }
         }
         catch { return false; }
+        return false;
     }
 
     public sealed record SearchHit(string Title, string Path);
@@ -154,7 +166,8 @@ public sealed class KiwixClient
     public async Task<List<SearchHit>> SearchAsync(string pattern, int k)
     {
         // Kiwix returns HTML/XML; we'll parse a simple HTML list by regex (fast + dirty)
-        var url = $"http://{_host}:{_port}/search?pattern={Uri.EscapeDataString(pattern)}&content=html";
+        var connectHost = ResolveClientHost(_host);
+        var url = $"http://{connectHost}:{_port}/search?pattern={Uri.EscapeDataString(pattern)}&content=html";
         var html = await _http.GetStringAsync(url);
         var hits = new List<SearchHit>();
 
@@ -184,7 +197,25 @@ public sealed class KiwixClient
     {
         // prefer /content/ path; if caller passed /wiki/..., just forward it
         var path = pathOrTitle.StartsWith("/") ? pathOrTitle : $"/wiki/{Uri.EscapeDataString(pathOrTitle)}";
-        var url = $"http://{_host}:{_port}{path}";
+        var connectHost = ResolveClientHost(_host);
+        var url = $"http://{connectHost}:{_port}{path}";
         return await _http.GetStringAsync(url);
+    }
+
+    static bool NeedsExplicitBind(string host)
+    {
+        var h = host?.Trim();
+        if (string.IsNullOrEmpty(h)) return false; // let kiwix-serve bind to all by default
+        // If host is a real address (not wildcard), pass it
+        if (h == "0.0.0.0" || h == "*" || h == "::" || h == "[::]") return false;
+        return true;
+    }
+
+    static string ResolveClientHost(string host)
+    {
+        var h = host?.Trim();
+        if (string.IsNullOrEmpty(h) || h == "0.0.0.0" || h == "*" || h == "::" || h == "[::]")
+            return "127.0.0.1";
+        return h;
     }
 }
