@@ -33,11 +33,16 @@ public sealed class KiwixClient
         var addressArg = NeedsExplicitBind(_host) ? $" --address={_host}" : string.Empty;
         var psi = new ProcessStartInfo(servePath, $"--port={_port}{addressArg} \"{zimPath}\"")
         {
-            UseShellExecute = false, CreateNoWindow = true
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true
         };
         try
         {
-            Process.Start(psi);
+            var p = Process.Start(psi);
+            // Discard output to avoid clutter and full buffers
+            p!.OutputDataReceived += (_, __) => { };
+            p.ErrorDataReceived += (_, __) => { };
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
         }
         catch (Exception ex)
         {

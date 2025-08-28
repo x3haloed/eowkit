@@ -10,6 +10,7 @@ public sealed class OllamaClient
     private readonly HttpClient _http = new();
     private readonly string _base;
     private readonly string? _modelsDir;
+    private Process? _serveProcess;
 
     public OllamaClient(string baseUrl, string? modelsDir = null)
     {
@@ -26,14 +27,24 @@ public sealed class OllamaClient
         var exe = ResolveOllamaPath() ?? "ollama";
         var psi = new ProcessStartInfo(exe, "serve")
         {
-            UseShellExecute = false, CreateNoWindow = true
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
         };
+        psi.Environment["OLLAMA_DEBUG"] = "ERROR";
         if (!string.IsNullOrWhiteSpace(_modelsDir))
         {
             Directory.CreateDirectory(_modelsDir);
             psi.Environment["OLLAMA_MODELS"] = _modelsDir;
         }
-        Process.Start(psi);
+        var p = Process.Start(psi)!;
+        _serveProcess = p;
+        // Discard output to avoid clutter and full buffers
+        p.OutputDataReceived += (_, __) => { };
+        p.ErrorDataReceived += (_, __) => { };
+        p.BeginOutputReadLine();
+        p.BeginErrorReadLine();
 
         for (int i=0;i<30;i++)
         {
@@ -94,7 +105,7 @@ public sealed class OllamaClient
         if (string.IsNullOrWhiteSpace(model)) return;
         if (await ModelExistsAsync(model)) return;
 
-        // Stream pull progress
+        // Stream pull progress (throttled)
         var pullPayload = "{\"name\":\"" + EscapeJsonString(model) + "\",\"stream\":true}";
         using (var pullContent = new StringContent(pullPayload, System.Text.Encoding.UTF8, "application/json"))
         using (var request = new HttpRequestMessage(HttpMethod.Post, $"{_base}/api/pull") { Content = pullContent })
@@ -104,6 +115,10 @@ public sealed class OllamaClient
             using var s = await resp.Content.ReadAsStreamAsync();
             using var reader = new StreamReader(s);
             string? line;
+            string lastDigest = string.Empty;
+            string lastStatus = string.Empty;
+            double lastPct = -1.0;
+            var lastEmit = DateTime.MinValue;
             while ((line = await reader.ReadLineAsync()) is not null)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -117,13 +132,49 @@ public sealed class OllamaClient
                     long total = root.TryGetProperty("total", out var tt) ? tt.GetInt64() : 0;
                     string err = root.TryGetProperty("error", out var er) ? (er.GetString() ?? "") : "";
 
-                    if (!string.IsNullOrEmpty(err)) progress?.Invoke($"pull error: {err}");
-                    else if (total > 0) progress?.Invoke($"pull {status} {digest} {completed}/{total} ({(completed*100.0/total):F1}%)");
-                    else if (!string.IsNullOrEmpty(status)) progress?.Invoke($"pull {status} {digest}");
+                    if (!string.IsNullOrEmpty(err))
+                    {
+                        progress?.Invoke($"pull error: {err}");
+                        continue;
+                    }
+
+                    bool shouldEmit = false;
+                    if (total > 0)
+                    {
+                        var pct = completed * 100.0 / total;
+                        if (Math.Abs(pct - lastPct) >= 1.0) { shouldEmit = true; lastPct = pct; }
+                    }
+                    if (!shouldEmit && (!string.Equals(status, lastStatus, StringComparison.Ordinal) || !string.Equals(digest, lastDigest, StringComparison.Ordinal)))
+                    {
+                        shouldEmit = true;
+                    }
+                    if (!shouldEmit && (DateTime.UtcNow - lastEmit).TotalSeconds >= 2)
+                    {
+                        shouldEmit = true;
+                    }
+
+                    if (shouldEmit)
+                    {
+                        lastEmit = DateTime.UtcNow;
+                        lastStatus = status; lastDigest = digest;
+                        if (total > 0)
+                        {
+                            progress?.Invoke($"pull {status} {digest} {completed}/{total} ({(completed*100.0/total):F1}%)");
+                        }
+                        else if (!string.IsNullOrEmpty(status) || !string.IsNullOrEmpty(digest))
+                        {
+                            progress?.Invoke($"pull {status} {digest}");
+                        }
+                    }
                 }
                 catch
                 {
-                    progress?.Invoke(line);
+                    // rare non-JSON line; throttle
+                    if ((DateTime.UtcNow - lastEmit).TotalSeconds >= 2)
+                    {
+                        lastEmit = DateTime.UtcNow;
+                        progress?.Invoke(line);
+                    }
                 }
             }
         }
