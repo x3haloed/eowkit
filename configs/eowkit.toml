@@ -1,6 +1,6 @@
 [model]
 # Ollama model name or empty if using mobile MLC only
-ollama = "llama3.1:8b-instruct-fp16"
+ollama = "phi3:mini"
 
 [mobile]
 # For phone builds (MLC). Optional here; the installer will present choices.

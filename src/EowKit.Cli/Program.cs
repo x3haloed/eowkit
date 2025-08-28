@@ -14,7 +14,7 @@ switch (command)
         AnsiConsole.MarkupLine($"[bold]RAM:[/] {probe.TotalRamBytes/1_000_000_000.0:F1} GB  " +
                                $"[bold]Disk Free:[/] {DiskProbe.GetFreeBytes(".")/1_000_000_000.0:F1} GB  " +
                                $"[bold]CPU AVX2:[/] {(probe.HasAvx2 ? "yes" : "no")}  [bold]Cores:[/] {probe.LogicalCores}  " +
-                               $"[bold]GPU:[/] CUDA={(probe.HasCuda?"yes":"no")}, OpenCL={(probe.HasOpenCl?"yes":"no")}, Metal={(probe.HasMetal?"yes":"no")}");
+                               $"[bold]GPU:[/] CUDA={(probe.HasCuda?"yes":"no")}, OpenCL={(probe.HasOpenCl?"yes":"no")}, Metal={(probe.HasMetal?"yes":"no")}" );
         break;
     }
 
@@ -61,7 +61,7 @@ switch (command)
 
         var ollama = new OllamaClient(cfg.Llm.OllamaUrl, string.IsNullOrWhiteSpace(cfg.Paths.ModelsDir) ? null : cfg.Paths.ModelsDir);
         await ollama.EnsureServeAsync();
-        await ollama.EnsureModelAsync(cfg.Model.Ollama);
+        await ollama.EnsureModelAsync(cfg.Model.Ollama, progress: line => AnsiConsole.MarkupLine($"[blue]{Markup.Escape(line)}[/]"));
 
         var orchestrator = new Orchestrator(cfg, kiwix, ollama);
         AnsiConsole.MarkupLine("[bold green]EOW Kit ready.[/] Type your question. Ctrl-C to exit.");

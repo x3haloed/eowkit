@@ -89,44 +89,117 @@ public sealed class OllamaClient
         catch { return false; }
     }
 
-    public async Task EnsureModelAsync(string model)
+    public async Task EnsureModelAsync(string model, Action<string>? progress = null)
     {
         if (string.IsNullOrWhiteSpace(model)) return;
-        var jsonText = await _http.GetStringAsync($"{_base}/api/tags");
-        using var doc = JsonDocument.Parse(jsonText);
-        var root = doc.RootElement;
-        bool exists = false;
-        if (root.TryGetProperty("models", out var modelsArray))
+        if (await ModelExistsAsync(model)) return;
+
+        // Stream pull progress
+        var pullPayload = "{\"name\":\"" + EscapeJsonString(model) + "\",\"stream\":true}";
+        using (var pullContent = new StringContent(pullPayload, System.Text.Encoding.UTF8, "application/json"))
+        using (var request = new HttpRequestMessage(HttpMethod.Post, $"{_base}/api/pull") { Content = pullContent })
+        using (var resp = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
         {
-            foreach (var m in modelsArray.EnumerateArray())
+            resp.EnsureSuccessStatusCode();
+            using var s = await resp.Content.ReadAsStreamAsync();
+            using var reader = new StreamReader(s);
+            string? line;
+            while ((line = await reader.ReadLineAsync()) is not null)
             {
-                if (m.TryGetProperty("name", out var n) && string.Equals(n.GetString(), model, StringComparison.Ordinal))
+                if (string.IsNullOrWhiteSpace(line)) continue;
+                try
                 {
-                    exists = true; break;
+                    using var doc = JsonDocument.Parse(line);
+                    var root = doc.RootElement;
+                    string status = root.TryGetProperty("status", out var st) ? (st.GetString() ?? "") : "";
+                    string digest = root.TryGetProperty("digest", out var dg) ? (dg.GetString() ?? "") : "";
+                    long completed = root.TryGetProperty("completed", out var cm) ? cm.GetInt64() : 0;
+                    long total = root.TryGetProperty("total", out var tt) ? tt.GetInt64() : 0;
+                    string err = root.TryGetProperty("error", out var er) ? (er.GetString() ?? "") : "";
+
+                    if (!string.IsNullOrEmpty(err)) progress?.Invoke($"pull error: {err}");
+                    else if (total > 0) progress?.Invoke($"pull {status} {digest} {completed}/{total} ({(completed*100.0/total):F1}%)");
+                    else if (!string.IsNullOrEmpty(status)) progress?.Invoke($"pull {status} {digest}");
+                }
+                catch
+                {
+                    progress?.Invoke(line);
                 }
             }
         }
-        if (!exists)
+
+        // Poll until model appears (up to ~10 minutes)
+        for (int i = 0; i < 600; i++)
         {
-            var payload = "{\"name\":\"" + EscapeJsonString(model) + "\"}";
-            using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-            using var resp = await _http.PostAsync($"{_base}/api/pull", content);
-            resp.EnsureSuccessStatusCode();
+            await Task.Delay(1000);
+            try
+            {
+                if (await ModelExistsAsync(model)) return;
+            }
+            catch { /* ignore and keep waiting */ }
         }
+        throw new Exception($"Timeout waiting for Ollama to download model '{model}'.");
+    }
+
+    private async Task<bool> ModelExistsAsync(string model)
+    {
+        var payload = "{\"name\":\"" + EscapeJsonString(model) + "\"}";
+        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
+        using var resp = await _http.PostAsync($"{_base}/api/show", content);
+        if (resp.IsSuccessStatusCode) return true;
+        if ((int)resp.StatusCode == 404) return false;
+        return false;
     }
 
     public async Task<string> ChatOnceAsync(string model, string prompt, int ctx, double temp, int? numThreads = null)
     {
-        var payload = BuildChatRequestPayload(model, prompt, ctx, temp, numThreads);
-        using var content = new StringContent(payload, System.Text.Encoding.UTF8, "application/json");
-        using var resp = await _http.PostAsync($"{_base}/api/chat", content);
-        resp.EnsureSuccessStatusCode();
-        var respText = await resp.Content.ReadAsStringAsync();
-        using var doc = JsonDocument.Parse(respText);
-        var root = doc.RootElement;
-        var message = root.TryGetProperty("message", out var msgEl) ? msgEl : default;
-        var text = message.ValueKind == JsonValueKind.Object && message.TryGetProperty("content", out var c) ? (c.GetString() ?? string.Empty) : string.Empty;
-        return text.Trim();
+        // First try the chat endpoint
+        var chatPayload = BuildChatRequestPayload(model, prompt, ctx, temp, numThreads);
+        using (var chatContent = new StringContent(chatPayload, System.Text.Encoding.UTF8, "application/json"))
+        using (var chatResp = await _http.PostAsync($"{_base}/api/chat", chatContent))
+        {
+            if (chatResp.IsSuccessStatusCode)
+            {
+                var respText = await chatResp.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(respText);
+                var root = doc.RootElement;
+                var message = root.TryGetProperty("message", out var msgEl) ? msgEl : default;
+                var text = message.ValueKind == JsonValueKind.Object && message.TryGetProperty("content", out var c) ? (c.GetString() ?? string.Empty) : string.Empty;
+                return text.Trim();
+            }
+            // If endpoint missing, fall back
+            if ((int)chatResp.StatusCode != 404)
+            {
+                chatResp.EnsureSuccessStatusCode();
+            }
+        }
+
+        // Fallback: use /api/generate with a single prompt and non-stream
+        var sb = new System.Text.StringBuilder(512);
+        sb.Append("{\"model\":\"").Append(EscapeJsonString(model)).Append("\",");
+        sb.Append("\"prompt\":\"").Append(EscapeJsonString(prompt)).Append("\",");
+        sb.Append("\"options\":{");
+        sb.Append("\"num_ctx\":").Append(ctx).Append(',');
+        sb.Append("\"temperature\":").Append(temp.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        if (numThreads.HasValue)
+        {
+            sb.Append(',').Append("\"num_thread\":").Append(numThreads.Value);
+        }
+        sb.Append("},");
+        sb.Append("\"stream\":false");
+        sb.Append('}');
+        var genPayload = sb.ToString();
+
+        using var genContent = new StringContent(genPayload, System.Text.Encoding.UTF8, "application/json");
+        using var genResp = await _http.PostAsync($"{_base}/api/generate", genContent);
+        genResp.EnsureSuccessStatusCode();
+        var genText = await genResp.Content.ReadAsStringAsync();
+        using (var genDoc = JsonDocument.Parse(genText))
+        {
+            var root = genDoc.RootElement;
+            var text = root.TryGetProperty("response", out var r) ? (r.GetString() ?? string.Empty) : string.Empty;
+            return text.Trim();
+        }
     }
 
     // Helpers (no reflection)

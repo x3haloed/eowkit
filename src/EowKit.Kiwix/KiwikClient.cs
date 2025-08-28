@@ -165,10 +165,30 @@ public sealed class KiwixClient
 
     public async Task<List<SearchHit>> SearchAsync(string pattern, int k)
     {
-        // Kiwix returns HTML/XML; we'll parse a simple HTML list by regex (fast + dirty)
+        // Kiwix returns HTML; some builds return 400 for certain param combos. Try fallbacks.
         var connectHost = ResolveClientHost(_host);
-        var url = $"http://{connectHost}:{_port}/search?pattern={Uri.EscapeDataString(pattern)}&content=html";
-        var html = await _http.GetStringAsync(url);
+        var encoded = Uri.EscapeDataString(pattern);
+        var candidateUrls = new[]
+        {
+            $"http://{connectHost}:{_port}/search?pattern={encoded}&content=html",
+            $"http://{connectHost}:{_port}/search?pattern={encoded}"
+        };
+
+        string? html = null;
+        foreach (var u in candidateUrls)
+        {
+            try
+            {
+                html = await _http.GetStringAsync(u);
+                if (!string.IsNullOrWhiteSpace(html)) break;
+            }
+            catch
+            {
+                // try next form
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(html)) return new List<SearchHit>();
         var hits = new List<SearchHit>();
 
         // very simple extraction: <a href="/A/B/C">Title</a>
